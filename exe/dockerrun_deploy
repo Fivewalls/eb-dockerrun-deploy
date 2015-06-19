@@ -76,6 +76,8 @@ class Deploy < Thor
     STDOUT.puts "Deployed!"
   end
 
+  default_task :deploy_single
+
   private
 
   def opts
