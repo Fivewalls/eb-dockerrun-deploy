@@ -1,0 +1,7 @@
+application-name: "my-app"
+image-name: "quay.io/fusionx/testimage"
+bucket-name: "my-bucket"
+bucket-key: "my-key.zip"
+auth-bucket-name: "my-auth-bucket"
+auth-bucket-key: "my-auth-bucket-key"
+container-port: "3001"
