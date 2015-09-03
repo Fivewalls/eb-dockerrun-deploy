@@ -1,0 +1,48 @@
+LineLength:
+  Description: 'Limit lines to 120 characters.'
+  Max: 120
+
+StringLiterals:
+  Enabled: false
+
+RedundantSelf:
+  Enabled: false
+
+SpaceAroundEqualsInParameterDefault:
+  EnforcedStyle: no_space
+
+AccessModifierIndentation:
+  EnforcedStyle: outdent
+
+CollectionMethods:
+  Enabled: false
+
+ClassAndModuleChildren:
+  Enabled: false
+
+CaseIndentation:
+  IndentWhenRelativeTo: case
+
+Style/Lambda:
+  Description: 'Do not use the new lambda literal syntax for single-line blocks.'
+  Enabled: false
+
+Documentation:
+  Enabled: false
+
+Style/IfUnlessModifier:
+  Enabled: false
+
+Metrics/MethodLength:
+  Max: 25
+Metrics/AbcSize:
+  Max: 32
+Metrics/ClassLength:
+  Max: 250
+
+AllCops:
+  Exclude:
+    - 'db/**/*'
+    - 'config/**/*'
+    - 'spec/spec_helper.rb'
+    - 'bin/*'
