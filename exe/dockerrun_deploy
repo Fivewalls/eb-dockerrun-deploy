@@ -6,105 +6,147 @@ require 'json'
 require 'aws-sdk'
 require 'securerandom'
 require 'zip'
+require 'fileutils'
+require 'eb/dockerrun/deploy'
 
+# Deploy the executable interface
 class Deploy < Thor
-  class_option "var-file",
-    default: "./dockerrun.yml",
+  attr_reader :opts, :option_parser
+  class_option(
+    'var-file',
+    default: './dockerrun.yml',
     type: :string,
-    aliases: "f",
-    desc: "File holding variables for deployment. Anything passed as an option to the command will override values here"
-  class_option "tag-name",
+    aliases: 'f',
+    desc: 'File holding variables for deployment. Anything passed as an option to the command will override values'\
+        'here'
+  )
+  class_option(
+    'tag-name',
     type: :string,
-    aliases: "t",
+    aliases: 't',
     desc: "Tag for docker image to pull in. If not specified in file or as an option, will default to 'latest'"
-  class_option "image-name",
+  )
+  class_option(
+    'image-name',
     type: :string,
-    aliases: "i",
-    desc: "The name of the docker image to use"
-  class_option "auth-bucket-name",
+    aliases: 'i',
+    desc: 'The name of the docker image to use'
+  )
+  class_option(
+    'auth-bucket-name',
     type: :string,
-    desc: "The s3 bucket name where the dockercfg file is stored, if required"
-  class_option "auth-bucket-key",
+    desc: 'The s3 bucket name where the dockercfg file is stored, if required'
+  )
+  class_option(
+    'auth-bucket-key',
     type: :string,
-    desc: "The s3 key of the dockercfg file, if required. A bucket name must also be provided"
-  class_option "container-port",
+    desc: 'The s3 key of the dockercfg file, if required. A bucket name must also be provided'
+  )
+  class_option(
+    'container-port',
     type: :string,
-    aliases: "p",
-    desc: "The port exposed by the container. If not specified in file or as an option, will default to 3000"
+    aliases: 'p',
+    desc: 'The port exposed by the container. If not specified in file or as an option, will default to 3000'
+  )
 
-  method_option "application-name",
+  method_option(
+    'application-name',
     type: :string,
-    aliases: "a",
-    desc: "The name of the EB application. Must be provided in file or as an option"
-  method_option "env-name",
+    aliases: 'a',
+    desc: 'The name of the EB application. Must be provided in file or as an option'
+  )
+  method_option(
+    'env-name',
     type: :string,
-    aliases: "e",
-    desc: "The name of the EB application environment to deploy. Must be provided in file or as an option"
-  method_option "version-label",
+    aliases: 'e',
+    desc: 'The name of the EB application environment to deploy. Must be provided in file or as an option'
+  )
+  method_option(
+    'version-label',
     type: :string,
-    desc: "The label for the version"
-  method_option "version-desc",
+    desc: 'The label for the version'
+  )
+  method_option(
+    'version-desc',
     type: :string,
-    desc: "The description for the version"
-  method_option "bucket-name",
+    desc: 'The description for the version'
+  )
+  method_option(
+    'bucket-name',
     type: :string,
-    aliases: "b",
-    desc: "The S3 bucket where new application version should be stored. Must be provided in file or as an option"
-  method_option "bucket-key",
+    aliases: 'b',
+    desc: 'The S3 bucket where new application version should be stored. Must be provided in file or as an option'
+  )
+  method_option(
+    'bucket-key',
     type: :string,
-    aliases: "k",
-    desc: "The S3 key to use when uploading application version.  Must be provided in file or as an option"
-  method_option "aws-access-key-id",
+    aliases: 'k',
+    desc: 'The S3 key to use when uploading application version.  Must be provided in file or as an option'
+  )
+  method_option(
+    'aws-access-key-id',
     type: :string,
-    desc: "The AWS access key. If not provided, will use stored credentials or environment variables"
-  method_option "aws-secret-access-key",
+    desc: 'The AWS access key. If not provided, will use stored credentials or environment variables'
+  )
+  method_option(
+    'aws-secret-access-key',
     type: :string,
-    desc: "The AWS secret access key. If not provided, will use stored credentials or environment variables"
-  method_option "aws-region",
+    desc: 'The AWS secret access key. If not provided, will use stored credentials or environment variables'
+  )
+  method_option(
+    'aws-region',
     type: :string,
-    desc: "The AWS region. If not provided, will use stored values or environment variables"
+    desc: 'The AWS region. If not provided, will use stored values or environment variables'
+  )
 
-  desc "deploy_single", "Deploy the EB dockerrun file"
+  desc 'deploy_single', 'Deploy the EB dockerrun file'
   def deploy_single
     parse_options
-    STDOUT.puts "Creating source bundle..."
-    build_zip
-    STDOUT.puts "Creating app version..."
+    STDOUT.puts 'Creating the source bundle...'
+    build_archive
+    STDOUT.puts 'Creating app version...'
     create_app_version
-    STDOUT.puts "Deploying app version..."
+    STDOUT.puts 'Deploying app version...'
     deploy_app_version
-    STDOUT.puts "Deployed!"
+    STDOUT.puts 'Deployed!'
+  end
+
+  desc 'build_zip DEST', 'Build an application archive'
+  def build_zip(dest)
+    parse_options
+    build_zipfile(dest)
+  end
+
+  desc 'version', 'Output the version'
+  def version
+    STDOUT.puts Eb::Dockerrun::Deploy::VERSION
   end
 
   default_task :deploy_single
 
-  private
+private
 
   def opts
-    @opts || {}
-  end
-
-  def opts=(value)
-    @opts = value
+    option_parser.opts
   end
 
   def dockerrun_hash
     run_hash = {
-      "AWSEBDockerrunVersion" => "1",
-      "Image" => {
-        "Name" => "#{opts["image-name"]}:#{opts["tag-name"]}",
-        "Update" => "true"
+      'AWSEBDockerrunVersion' => '1',
+      'Image' => {
+        'Name' => "#{opts['image-name']}:#{opts['tag-name']}",
+        'Update' => 'true'
       },
-      "Ports" => [
+      'Ports' => [
         {
-          "ContainerPort" => opts["container-port"]
+          'ContainerPort' => opts['container-port']
         }
       ]
     }
-    if opts["auth-bucket-name"]
-      run_hash["Authentication"] = {
-        "Bucket" => opts["auth-bucket-name"],
-        "Key" => opts["auth-bucket-key"]
+    if opts['auth-bucket-name']
+      run_hash['Authentication'] = {
+        'Bucket' => opts['auth-bucket-name'],
+        'Key' => opts['auth-bucket-key']
       }
     end
 
@@ -112,11 +154,9 @@ class Deploy < Thor
   end
 
   def parse_options
-    self.opts = load_options_file(options["var-file"])
-    options.each do |key, value|
-      opts[key] = value unless value.nil?
-    end
-    validate_options
+    @option_parser = Eb::Dockerrun::Deploy::OptionParser.new(options)
+  rescue OptionParserError => e
+    abort e.message
   end
 
   def load_options_file(file)
@@ -125,52 +165,80 @@ class Deploy < Thor
   end
 
   def validate_options
-    opts["tag-name"] ||= "latest"
-    opts["container-port"] ||= "3000"
-    opts["version-label"] ||=  SecureRandom.uuid
-    opts["bucket-key"] ||= opts["version-label"]
-    validate_auth
+    opts['tag-name'] ||= 'latest'
+    opts['container-port'] ||= '3000'
+    opts['version-label'] ||= SecureRandom.uuid
+    opts['bucket-key'] ||= opts['version-label']
     STDOUT.puts opts.inspect
   end
 
-  def validate_auth
-    abort "Must provide auth-bucket-key as well" if opts.key?("auth-bucket-name") && !opts.key?("auth-bucket-key")
-    abort "Must provide auth-bucket-name as well" if opts.key?("auth-bucket-key") && !opts.key?("auth-bucket-name")
-  end
-
   def create_app_version
-    require_options("application-name", "version-label", "bucket-name", "bucket-key")
+    @option_parser.require_opts('application-name', 'version-label', 'bucket-name', 'bucket-key')
     resp = eb_client.create_application_version(
-      application_name: opts["application-name"],
-      version_label: opts["version-label"],
-      description: opts["description"],
+      application_name: opts['application-name'],
+      version_label: opts['version-label'],
+      description: opts['description'],
       source_bundle: {
-        s3_bucket: opts["bucket-name"],
-        s3_key: "#{opts["bucket-key"]}.zip"
+        s3_bucket: opts['bucket-name'],
+        s3_key: "#{opts['bucket-key']}.zip"
       },
       auto_create_application: false
     )
     STDOUT.puts "Created #{resp.application_version}"
+  rescue OptionParserError => e
+    abort e.message
   end
 
   def deploy_app_version
-    require_options("application-name", "version-label", "env-name")
+    @option_parser.require_opts('application-name', 'version-label', 'env-name')
     eb_client.update_environment(
-      version_label: opts["version-label"],
-      environment_name: opts["env-name"]
+      version_label: opts['version-label'],
+      environment_name: opts['env-name']
     )
+  rescue OptionParserError => e
+    abort e.message
   end
 
-  def build_zip
-    require_options("bucket-name", "bucket-key")
-    run_string = JSON.generate(dockerrun_hash)
+  def build_archive
+    @option_parser.require_opts('bucket-name', 'bucket-key')
     Dir.mktmpdir do |tmpdir|
-      File.write("#{tmpdir}/Dockerrun.aws.json", run_string)
-      Zip::File.open("#{tmpdir}/app_source.zip", Zip::File::CREATE) do |zipfile|
-        zipfile.add("Dockerrun.aws.json", "#{tmpdir}/Dockerrun.aws.json")
-      end
-      s3_client.put_object(bucket: opts["bucket-name"], key: "#{opts["bucket-key"]}.zip", body: IO.read("#{tmpdir}/app_source.zip"))
+      zip_path = File.join(tmpdir, 'app_source.zip')
+      build_zipfile(zip_path)
+      s3_client.put_object(
+        bucket: opts['bucket-name'],
+        key: "#{opts['bucket-key']}.zip",
+        body: IO.read(zip_path)
+      )
     end
+  rescue OptionParserError => e
+    abort e.message
+  end
+
+  def build_zipfile(dest)
+    run_string = JSON.generate(dockerrun_hash)
+    FileUtils.rm(dest) if File.exist?(dest)
+    Dir.mktmpdir do |tmpdir|
+      eb_extensions(tmpdir)
+      File.write("#{tmpdir}/Dockerrun.aws.json", run_string)
+      Zip::File.open(dest, Zip::File::CREATE) do |zipfile|
+        zipfile.add('Dockerrun.aws.json', File.join(tmpdir, 'Dockerrun.aws.json'))
+        zip_extensions(tmpdir, zipfile)
+      end
+    end
+  end
+
+  def zip_extensions(tmpdir, zipfile)
+    extension_path = File.join(tmpdir, '.ebextensions')
+    return unless Dir.exist?(extension_path)
+    STDOUT.puts "Zipping .ebextensions....."
+
+    files = Dir.entries(extension_path) - %w(. ..)
+    zipfile.mkdir('.ebextensions')
+    files.each do |file|
+      STDOUT.puts "Adding file #{file}"
+      zipfile.add(File.join('.ebextensions', file), File.join(extension_path, file))
+    end
+    STDOUT.puts "Done!"
   end
 
   def s3_client
@@ -193,17 +261,18 @@ class Deploy < Thor
 
   def creds_from_opts
     creds = {}
-    creds[:access_key_id] = opts["aws-access-key-id"] if opts.key?("aws-access-key-id")
-    creds[:secret_access_key] = opts["aws-secret-access-key"] if opts.key?("aws-secret-access-key")
-    creds[:region] = opts["aws-region"] if opts.key?("aws-region")
+    creds[:access_key_id] = opts['aws-access-key-id'] if opts.key?('aws-access-key-id')
+    creds[:secret_access_key] = opts['aws-secret-access-key'] if opts.key?('aws-secret-access-key')
+    creds[:region] = opts["aws-region"] if opts.key?('aws-region')
     STDOUT.puts "AWS credentials #{creds}"
     creds
   end
 
-  def require_options(*required)
-    required.each do |option|
-      abort "The required option #{option} was not provided" unless opts.key?(option)
-    end
+  def eb_extensions(tmpdir)
+    extension_folder_path = File.join(option_parser.working_path, '.ebextensions')
+    return unless Dir.exist?(extension_folder_path)
+    tmp_extension_folder_path = File.join(tmpdir, '.ebextensions')
+    FileUtils.cp_r(extension_folder_path, tmp_extension_folder_path)
   end
 end
 

@@ -1,9 +1,2 @@
-require "eb/dockerrun/deploy/version"
-
-module Eb
-  module Dockerrun
-    module Deploy
-      # Your code goes here...
-    end
-  end
-end
+require_relative 'deploy/version'
+require_relative 'deploy/option_parser'
