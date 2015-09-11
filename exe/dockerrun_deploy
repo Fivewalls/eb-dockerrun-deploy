@@ -12,6 +12,7 @@ require 'eb/dockerrun/deploy'
 # Deploy the executable interface
 class Deploy < Thor
   attr_reader :opts, :option_parser
+  OptionParserError = Eb::Dockerrun::Deploy::OptionParserError
   class_option(
     'var-file',
     default: './dockerrun.yml',
