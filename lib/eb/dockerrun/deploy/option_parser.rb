@@ -20,6 +20,7 @@ module Eb
           aws-region
           proxy-config
           dest
+          volumes
         )
         DEFAULT_PATH = './dockerrun.yml'
 

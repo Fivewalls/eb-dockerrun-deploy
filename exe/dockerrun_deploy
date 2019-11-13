@@ -49,6 +49,11 @@ class Deploy < Thor
     aliases: 'p',
     desc: 'The port exposed by the container. If not specified in file or as an option, will default to 3000'
   )
+  class_option(
+    'volumes',
+    type: :array,
+    desc: 'Volumes'
+  )
 
   method_option(
     'application-name',
@@ -144,6 +149,14 @@ private
         }
       ]
     }
+    if opts['volumes']
+      run_hash['Volumes'] = opts['volumes'].map do |(_, data)|
+        {
+          "HostDirectory" => data['host'],
+          "ContainerDirectory" => data['container']
+        }
+      end
+    end
     if opts['auth-bucket-name']
       run_hash['Authentication'] = {
         'Bucket' => opts['auth-bucket-name'],
