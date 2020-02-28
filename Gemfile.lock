@@ -30,7 +30,7 @@ GEM
     json (1.8.3)
     minitest (5.8.0)
     multi_json (1.11.2)
-    rake (10.4.2)
+    rake (13.0.1)
     rspec (3.3.0)
       rspec-core (~> 3.3.0)
       rspec-expectations (~> 3.3.0)
@@ -57,7 +57,7 @@ DEPENDENCIES
   bundler (~> 1.10)
   eb-dockerrun-deploy!
   fakefs
-  rake (~> 10.0)
+  rake (~> 13.0)
   rspec
 
 BUNDLED WITH
